@@ -9,20 +9,27 @@
 <body>
     <div class="container">
         <header>
-            <h1>🎁 Secret Santa - Admin Panel</h1>
-            <p class="subtitle" id="occasionName">Loading...</p>
+            <div class="language-switcher">
+                <label data-i18n="language">Language</label>
+                <select id="languageSelector" onchange="i18n.setLanguage(this.value)">
+                    <option value="en" data-i18n="languageEN">English</option>
+                    <option value="lt" data-i18n="languageLT">Lietuvių</option>
+                </select>
+            </div>
+            <h1>🎁 <span data-i18n="appTitle">Secret Santa</span> - <span data-i18n="adminTitle">Admin Panel</span></h1>
+            <p class="subtitle" id="occasionName" data-i18n="loading">Loading...</p>
         </header>
 
         <main>
             <!-- Loading State -->
             <div id="loadingSection">
-                <p>Loading admin panel...</p>
+                <p data-i18n="loadingAdmin">Loading admin panel...</p>
             </div>
 
             <!-- Error State -->
             <div id="errorSection" style="display: none;">
                 <div class="error-box">
-                    <h2>Access Denied</h2>
+                    <h2 data-i18n="errorTitle">Access Denied</h2>
                     <p id="errorMessage"></p>
                 </div>
             </div>
@@ -37,40 +44,41 @@
                 </div>
 
                 <div class="links-box">
-                    <h3>Share Links</h3>
+                    <h3 data-i18n="participantLink">Share Links</h3>
                     <div class="link-container">
-                        <label>Participant Link:</label>
+                        <label data-i18n="participantLink">Participant Link:</label>
                         <input type="text" id="groupLink" readonly>
-                        <button type="button" class="btn-copy" onclick="copyLink('groupLink')">Copy</button>
+                        <button type="button" class="btn-copy" onclick="copyLink('groupLink')" data-i18n="copyLink">Copy</button>
                     </div>
                 </div>
 
                 <div class="status-box">
-                    <h3>Group Status</h3>
+                    <h3 data-i18n="groupStatusTitle">Group Status</h3>
                     <div id="participantList"></div>
                 </div>
 
                 <div class="admin-actions">
-                    <h3>Admin Actions</h3>
-                    <button type="button" class="btn-warning" onclick="rerollAssignments()">Reroll All Assignments</button>
-                    <p class="hint">This will randomly reassign everyone. Current assignments and preferences will be kept.</p>
+                    <h3 id="adminActionsTitle">Admin Actions</h3>
+                    <button type="button" class="btn-warning" onclick="rerollAssignments()" data-i18n="rerollButton">Reroll All Assignments</button>
+                    <p class="hint" id="rerollHint">This will randomly reassign everyone. Current assignments and preferences will be kept.</p>
                 </div>
 
                 <div class="assignments-box">
-                    <h3>Current Assignments (View Only)</h3>
-                    <p class="warning">Secret Santa assignments are visible to you as admin. Don't share this with participants!</p>
+                    <h3 id="assignmentsBoxTitle">Current Assignments (View Only)</h3>
+                    <p class="warning" id="assignmentsWarning">Secret Santa assignments are visible to you as admin. Don't share this with participants!</p>
                     <div id="assignmentsList"></div>
                 </div>
             </div>
         </main>
 
         <footer>
-            <p>No registration required • No cookies • Temporary storage only</p>
+            <p data-i18n="footerText">No registration required • No cookies • Temporary storage only</p>
         </footer>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config.js"></script>
+    <script src="js/i18n.js"></script>
     <script src="js/app.js"></script>
     <script>
         let currentGroup = null;
@@ -82,7 +90,7 @@
             const adminCode = urlParams.get('admin');
 
             if (!groupId || !adminCode) {
-                showError('Invalid admin link. Please check your URL.');
+                showError(i18n.t('invalidLink'));
                 return;
             }
 
@@ -90,18 +98,18 @@
                 currentGroup = await getGroup(groupId);
 
                 if (!currentGroup) {
-                    showError('Group not found or has expired.');
+                    showError(i18n.t('groupNotFound'));
                     return;
                 }
 
                 if (currentGroup.admin_code !== adminCode) {
-                    showError('Invalid admin code. You do not have permission to access this page.');
+                    showError(i18n.t('invalidAdminCode'));
                     return;
                 }
 
                 await showAdminDashboard();
             } catch (error) {
-                showError('Error loading admin panel: ' + error.message);
+                showError(i18n.t('errorLoadingGroup') + ' ' + error.message);
             }
         }
 
@@ -111,21 +119,27 @@
 
             document.getElementById('groupOccasion').textContent = currentGroup.occasion_name;
             document.getElementById('occasionName').textContent = currentGroup.occasion_name;
-            document.getElementById('groupMessage').textContent = currentGroup.custom_message || 'No custom message';
+            document.getElementById('groupMessage').textContent = currentGroup.custom_message || '';
 
             if (currentGroup.budget_limit) {
-                document.getElementById('groupBudget').textContent = `Budget: ${currentGroup.budget_limit}`;
+                document.getElementById('groupBudget').textContent = i18n.t('budgetLabel') + ' ' + currentGroup.budget_limit;
             }
 
             const expiresAt = new Date(currentGroup.expires_at);
             const now = new Date();
             const daysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
-            document.getElementById('expiresInfo').textContent = `Group expires in ${daysLeft} days (${expiresAt.toLocaleDateString()})`;
+            document.getElementById('expiresInfo').textContent = i18n.t('expiresIn', { days: daysLeft }) + ' (' + expiresAt.toLocaleDateString() + ')';
 
             // Set participant link
             const baseUrl = window.location.origin + window.location.pathname.replace('admin.html', '');
             const groupLink = `${baseUrl}group.html?id=${currentGroup.id}`;
             document.getElementById('groupLink').value = groupLink;
+
+            // Update static text
+            document.getElementById('adminActionsTitle').textContent = i18n.t('adminTitle');
+            document.getElementById('rerollHint').textContent = i18n.t('rerollConfirm');
+            document.getElementById('assignmentsBoxTitle').textContent = i18n.t('assignmentTitle');
+            document.getElementById('assignmentsWarning').textContent = i18n.t('preferencesHelp');
 
             await refreshParticipantList();
         }
@@ -138,20 +152,20 @@
             const joinedNames = participants.map(p => p.name);
             const notJoinedNames = currentGroup.participants.filter(name => !joinedNames.includes(name));
 
-            let html = `<p><strong>${participants.length} of ${currentGroup.participants.length} participants joined</strong></p>`;
+            let html = `<p><strong>${i18n.t('participantsJoined', { count: participants.length, total: currentGroup.participants.length })}</strong></p>`;
 
             if (participants.length > 0) {
-                html += '<h4>Joined:</h4><ul>';
+                html += `<h4>${i18n.t('joined')}:</h4><ul>`;
                 participants.forEach(p => {
                     const prefIcon = p.gift_preferences ? '✓' : '○';
-                    html += `<li>${p.name} ${prefIcon} (joined ${new Date(p.joined_at).toLocaleDateString()})</li>`;
+                    html += `<li>${p.name} ${prefIcon} (${i18n.t('joined').toLowerCase()} ${new Date(p.joined_at).toLocaleDateString()})</li>`;
                 });
                 html += '</ul>';
-                html += '<p class="hint">✓ = has added gift preferences, ○ = no preferences yet</p>';
+                html += `<p class="hint">✓ = ${i18n.t('hasPreferences')}, ○ = ${i18n.t('noPreferences')}</p>`;
             }
 
             if (notJoinedNames.length > 0) {
-                html += '<h4>Not Joined Yet:</h4><ul>';
+                html += `<h4>${i18n.t('notJoinedYet')}:</h4><ul>`;
                 notJoinedNames.forEach(name => {
                     html += `<li>${name}</li>`;
                 });
@@ -165,27 +179,27 @@
             if (participants.length > 0) {
                 let assignmentsHtml = '<ul class="assignments-list">';
                 participants.forEach(p => {
-                    const assignedTo = p.assigned_to || 'Not assigned yet';
+                    const assignedTo = p.assigned_to || i18n.t('notAssignedYet');
                     assignmentsHtml += `<li><strong>${p.name}</strong> → ${assignedTo}</li>`;
                 });
                 assignmentsHtml += '</ul>';
                 assignmentsDiv.innerHTML = assignmentsHtml;
             } else {
-                assignmentsDiv.innerHTML = '<p>No participants have joined yet.</p>';
+                assignmentsDiv.innerHTML = `<p>${i18n.t('noParticipantsYet')}</p>`;
             }
         }
 
         async function rerollAssignments() {
-            if (!confirm('Are you sure you want to reroll all Secret Santa assignments? This will randomly reassign everyone.')) {
+            if (!confirm(i18n.t('rerollConfirm'))) {
                 return;
             }
 
             try {
                 await rerollGroupAssignments(currentGroup.id);
-                alert('Assignments have been rerolled!');
+                alert(i18n.t('rerollSuccess'));
                 await refreshParticipantList();
             } catch (error) {
-                alert('Error rerolling assignments: ' + error.message);
+                alert(i18n.t('errorRerolling') + ' ' + error.message);
             }
         }
 
@@ -202,12 +216,35 @@
             navigator.clipboard.writeText(input.value);
 
             const btn = input.nextElementSibling;
-            const originalText = btn.textContent;
-            btn.textContent = 'Copied!';
+            btn.textContent = i18n.t('copiedSuccess');
             setTimeout(() => {
-                btn.textContent = originalText;
+                i18n.updatePage();
             }, 2000);
         }
+
+        // Update dynamic content on language change
+        document.addEventListener('languageChanged', () => {
+            if (currentGroup) {
+                // Refresh the display with new language
+                const expiresAt = new Date(currentGroup.expires_at);
+                const now = new Date();
+                const daysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+                document.getElementById('expiresInfo').textContent = i18n.t('expiresIn', { days: daysLeft }) + ' (' + expiresAt.toLocaleDateString() + ')';
+
+                if (currentGroup.budget_limit) {
+                    document.getElementById('groupBudget').textContent = i18n.t('budgetLabel') + ' ' + currentGroup.budget_limit;
+                }
+
+                document.getElementById('adminActionsTitle').textContent = i18n.t('adminTitle');
+                document.getElementById('rerollHint').textContent = i18n.t('rerollConfirm');
+                document.getElementById('assignmentsBoxTitle').textContent = i18n.t('assignmentTitle');
+                document.getElementById('assignmentsWarning').textContent = i18n.t('preferencesHelp');
+
+                if (participants) {
+                    refreshParticipantList();
+                }
+            }
+        });
 
         // Load admin panel on page load
         loadAdminPanel();

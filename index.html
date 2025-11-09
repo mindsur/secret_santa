@@ -9,83 +9,92 @@
 <body>
     <div class="container">
         <header>
-            <h1>🎁 Secret Santa</h1>
-            <p class="subtitle">Create your Secret Santa group</p>
+            <div class="language-switcher">
+                <label data-i18n="language">Language</label>
+                <select id="languageSelector" onchange="i18n.setLanguage(this.value)">
+                    <option value="en" data-i18n="languageEN">English</option>
+                    <option value="lt" data-i18n="languageLT">Lietuvių</option>
+                </select>
+            </div>
+            <h1>🎁 <span data-i18n="appTitle">Secret Santa</span></h1>
+            <p class="subtitle" data-i18n="subtitle">Create your Secret Santa group</p>
         </header>
 
         <main>
             <form id="createGroupForm">
                 <div class="form-group">
-                    <label for="occasionName">Occasion Name *</label>
-                    <input type="text" id="occasionName" placeholder="e.g., Christmas 2025, Birthday Party" required>
+                    <label for="occasionName" data-i18n="occasionLabel">Occasion Name *</label>
+                    <input type="text" id="occasionName" data-i18n-placeholder="occasionPlaceholder" placeholder="e.g., Christmas 2025, Birthday Party" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="customMessage">Custom Message (Optional)</label>
-                    <textarea id="customMessage" rows="3" placeholder="Add a special message for your group..."></textarea>
+                    <label for="customMessage" data-i18n="customMessageLabel">Custom Message (Optional)</label>
+                    <textarea id="customMessage" rows="3" data-i18n-placeholder="customMessagePlaceholder" placeholder="Add a special message for your group..."></textarea>
                 </div>
 
                 <div class="form-group">
-                    <label for="budgetLimit">Budget Limit (Optional)</label>
-                    <input type="text" id="budgetLimit" placeholder="e.g., $25, €30, 1000 RSD">
+                    <label for="budgetLimit" data-i18n="budgetLabel">Budget Limit (Optional)</label>
+                    <input type="text" id="budgetLimit" data-i18n-placeholder="budgetPlaceholder" placeholder="e.g., $25, €30, 1000 RSD">
                 </div>
 
                 <div class="form-group">
-                    <label for="groupLifetime">Group Active For (Days) *</label>
+                    <label for="groupLifetime" data-i18n="groupLifetimeLabel">Group Active For (Days) *</label>
                     <input type="number" id="groupLifetime" value="30" min="1" max="365" required>
                 </div>
 
                 <div class="form-group">
-                    <label>Participants *</label>
+                    <label data-i18n="participantsLabel">Participants *</label>
                     <div id="participantsList">
                         <div class="participant-item">
                             <input type="text" class="participant-name" placeholder="Participant name" required>
-                            <button type="button" class="btn-remove" onclick="removeParticipant(this)">Remove</button>
+                            <button type="button" class="btn-remove" onclick="removeParticipant(this)" data-i18n="delete">Remove</button>
                         </div>
                         <div class="participant-item">
                             <input type="text" class="participant-name" placeholder="Participant name" required>
-                            <button type="button" class="btn-remove" onclick="removeParticipant(this)">Remove</button>
+                            <button type="button" class="btn-remove" onclick="removeParticipant(this)" data-i18n="delete">Remove</button>
                         </div>
                         <div class="participant-item">
                             <input type="text" class="participant-name" placeholder="Participant name" required>
-                            <button type="button" class="btn-remove" onclick="removeParticipant(this)">Remove</button>
+                            <button type="button" class="btn-remove" onclick="removeParticipant(this)" data-i18n="delete">Remove</button>
                         </div>
                     </div>
-                    <button type="button" class="btn-secondary" onclick="addParticipant()">+ Add Participant</button>
-                    <p class="hint">Minimum 3 participants required</p>
+                    <button type="button" class="btn-secondary" onclick="addParticipant()" id="addParticipantBtn">+ Add Participant</button>
+                    <p class="hint" id="minParticipantsHint">Minimum 3 participants required</p>
                 </div>
 
-                <button type="submit" class="btn-primary" id="createBtn">Create Secret Santa Group</button>
+                <button type="submit" class="btn-primary" id="createBtn" data-i18n="createButton">Create Secret Santa Group</button>
             </form>
 
             <div id="resultSection" class="result-section" style="display: none;">
-                <h2>Group Created Successfully!</h2>
+                <h2 data-i18n="successTitle">Group Created Successfully!</h2>
                 <div class="link-box">
-                    <label>Share this link with participants:</label>
+                    <label data-i18n="participantLink">Share this link with participants:</label>
                     <div class="link-container">
                         <input type="text" id="groupLink" readonly>
-                        <button type="button" class="btn-copy" onclick="copyLink('groupLink')">Copy</button>
+                        <button type="button" class="btn-copy" onclick="copyLink('groupLink')" data-i18n="copyLink">Copy</button>
                     </div>
+                    <p class="hint" data-i18n="participantLinkHelp">Send this to all participants</p>
                 </div>
                 <div class="link-box">
-                    <label>Admin link (for managing the group):</label>
+                    <label data-i18n="adminLink">Admin link (for managing the group):</label>
                     <div class="link-container">
                         <input type="text" id="adminLink" readonly>
-                        <button type="button" class="btn-copy" onclick="copyLink('adminLink')">Copy</button>
+                        <button type="button" class="btn-copy" onclick="copyLink('adminLink')" data-i18n="copyLink">Copy</button>
                     </div>
+                    <p class="hint" data-i18n="adminLinkHelp">Keep this private - it allows you to manage the group</p>
                 </div>
-                <p class="warning">Save both links! You won't be able to recover them later.</p>
-                <button type="button" class="btn-secondary" onclick="location.reload()">Create Another Group</button>
+                <button type="button" class="btn-secondary" onclick="location.reload()" id="createAnotherBtn">Create Another Group</button>
             </div>
         </main>
 
         <footer>
-            <p>No registration required • No cookies • Temporary storage only</p>
+            <p data-i18n="footerText">No registration required • No cookies • Temporary storage only</p>
         </footer>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config.js"></script>
+    <script src="js/i18n.js"></script>
     <script src="js/app.js"></script>
     <script>
         function addParticipant() {
@@ -94,9 +103,10 @@
             div.className = 'participant-item';
             div.innerHTML = `
                 <input type="text" class="participant-name" placeholder="Participant name" required>
-                <button type="button" class="btn-remove" onclick="removeParticipant(this)">Remove</button>
+                <button type="button" class="btn-remove" onclick="removeParticipant(this)" data-i18n="delete">Remove</button>
             `;
             list.appendChild(div);
+            i18n.updatePage();
         }
 
         function removeParticipant(btn) {
@@ -104,7 +114,7 @@
             if (items.length > 3) {
                 btn.parentElement.remove();
             } else {
-                alert('Minimum 3 participants required');
+                alert(i18n.t('needTwoParticipants'));
             }
         }
 
@@ -116,9 +126,9 @@
 
             const btn = input.nextElementSibling;
             const originalText = btn.textContent;
-            btn.textContent = 'Copied!';
+            btn.textContent = i18n.t('copiedSuccess');
             setTimeout(() => {
-                btn.textContent = originalText;
+                i18n.updatePage();
             }, 2000);
         }
 
@@ -136,20 +146,20 @@
                 .filter(name => name.length > 0);
 
             if (participants.length < 3) {
-                alert('Please add at least 3 participants');
+                alert(i18n.t('needThreeParticipants'));
                 return;
             }
 
             // Check for duplicate names
             const uniqueParticipants = [...new Set(participants)];
             if (uniqueParticipants.length !== participants.length) {
-                alert('Participant names must be unique');
+                alert(i18n.t('duplicateNames'));
                 return;
             }
 
             const btn = document.getElementById('createBtn');
             btn.disabled = true;
-            btn.textContent = 'Creating...';
+            btn.textContent = i18n.t('creatingButton');
 
             try {
                 const result = await createGroup({
@@ -169,10 +179,22 @@
                 document.getElementById('createGroupForm').style.display = 'none';
                 document.getElementById('resultSection').style.display = 'block';
             } catch (error) {
-                alert('Error creating group: ' + error.message);
+                alert(i18n.t('errorCreatingGroup') + ' ' + error.message);
                 btn.disabled = false;
-                btn.textContent = 'Create Secret Santa Group';
+                btn.textContent = i18n.t('createButton');
             }
+        });
+
+        // Update dynamic text on language change
+        document.addEventListener('languageChanged', () => {
+            const addBtn = document.getElementById('addParticipantBtn');
+            if (addBtn) addBtn.textContent = '+ ' + i18n.t('participantsLabel');
+
+            const hint = document.getElementById('minParticipantsHint');
+            if (hint) hint.textContent = i18n.t('needThreeParticipants');
+
+            const createAnotherBtn = document.getElementById('createAnotherBtn');
+            if (createAnotherBtn) createAnotherBtn.textContent = i18n.t('createAnotherGroup');
         });
     </script>
 </body>
