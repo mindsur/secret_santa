@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secret Santa - Create Group</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎁 Secret Santa</h1>
+            <p class="subtitle">Create your Secret Santa group</p>
+        </header>
+
+        <main>
+            <form id="createGroupForm">
+                <div class="form-group">
+                    <label for="occasionName">Occasion Name *</label>
+                    <input type="text" id="occasionName" placeholder="e.g., Christmas 2025, Birthday Party" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="customMessage">Custom Message (Optional)</label>
+                    <textarea id="customMessage" rows="3" placeholder="Add a special message for your group..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="budgetLimit">Budget Limit (Optional)</label>
+                    <input type="text" id="budgetLimit" placeholder="e.g., $25, €30, 1000 RSD">
+                </div>
+
+                <div class="form-group">
+                    <label for="groupLifetime">Group Active For (Days) *</label>
+                    <input type="number" id="groupLifetime" value="30" min="1" max="365" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Participants *</label>
+                    <div id="participantsList">
+                        <div class="participant-item">
+                            <input type="text" class="participant-name" placeholder="Participant name" required>
+                            <button type="button" class="btn-remove" onclick="removeParticipant(this)">Remove</button>
+                        </div>
+                        <div class="participant-item">
+                            <input type="text" class="participant-name" placeholder="Participant name" required>
+                            <button type="button" class="btn-remove" onclick="removeParticipant(this)">Remove</button>
+                        </div>
+                        <div class="participant-item">
+                            <input type="text" class="participant-name" placeholder="Participant name" required>
+                            <button type="button" class="btn-remove" onclick="removeParticipant(this)">Remove</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-secondary" onclick="addParticipant()">+ Add Participant</button>
+                    <p class="hint">Minimum 3 participants required</p>
+                </div>
+
+                <button type="submit" class="btn-primary" id="createBtn">Create Secret Santa Group</button>
+            </form>
+
+            <div id="resultSection" class="result-section" style="display: none;">
+                <h2>Group Created Successfully!</h2>
+                <div class="link-box">
+                    <label>Share this link with participants:</label>
+                    <div class="link-container">
+                        <input type="text" id="groupLink" readonly>
+                        <button type="button" class="btn-copy" onclick="copyLink('groupLink')">Copy</button>
+                    </div>
+                </div>
+                <div class="link-box">
+                    <label>Admin link (for managing the group):</label>
+                    <div class="link-container">
+                        <input type="text" id="adminLink" readonly>
+                        <button type="button" class="btn-copy" onclick="copyLink('adminLink')">Copy</button>
+                    </div>
+                </div>
+                <p class="warning">Save both links! You won't be able to recover them later.</p>
+                <button type="button" class="btn-secondary" onclick="location.reload()">Create Another Group</button>
+            </div>
+        </main>
+
+        <footer>
+            <p>No registration required • No cookies • Temporary storage only</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        function addParticipant() {
+            const list = document.getElementById('participantsList');
+            const div = document.createElement('div');
+            div.className = 'participant-item';
+            div.innerHTML = `
+                <input type="text" class="participant-name" placeholder="Participant name" required>
+                <button type="button" class="btn-remove" onclick="removeParticipant(this)">Remove</button>
+            `;
+            list.appendChild(div);
+        }
+
+        function removeParticipant(btn) {
+            const items = document.querySelectorAll('.participant-item');
+            if (items.length > 3) {
+                btn.parentElement.remove();
+            } else {
+                alert('Minimum 3 participants required');
+            }
+        }
+
+        function copyLink(elementId) {
+            const input = document.getElementById(elementId);
+            input.select();
+            input.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(input.value);
+
+            const btn = input.nextElementSibling;
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        }
+
+        document.getElementById('createGroupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const occasionName = document.getElementById('occasionName').value.trim();
+            const customMessage = document.getElementById('customMessage').value.trim();
+            const budgetLimit = document.getElementById('budgetLimit').value.trim();
+            const groupLifetime = parseInt(document.getElementById('groupLifetime').value);
+
+            const participantInputs = document.querySelectorAll('.participant-name');
+            const participants = Array.from(participantInputs)
+                .map(input => input.value.trim())
+                .filter(name => name.length > 0);
+
+            if (participants.length < 3) {
+                alert('Please add at least 3 participants');
+                return;
+            }
+
+            // Check for duplicate names
+            const uniqueParticipants = [...new Set(participants)];
+            if (uniqueParticipants.length !== participants.length) {
+                alert('Participant names must be unique');
+                return;
+            }
+
+            const btn = document.getElementById('createBtn');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+
+            try {
+                const result = await createGroup({
+                    occasionName,
+                    customMessage,
+                    budgetLimit,
+                    participants: uniqueParticipants,
+                    groupLifetime
+                });
+
+                const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+                const groupLink = `${baseUrl}group.html?id=${result.id}`;
+                const adminLink = `${baseUrl}admin.html?id=${result.id}&admin=${result.admin_code}`;
+
+                document.getElementById('groupLink').value = groupLink;
+                document.getElementById('adminLink').value = adminLink;
+                document.getElementById('createGroupForm').style.display = 'none';
+                document.getElementById('resultSection').style.display = 'block';
+            } catch (error) {
+                alert('Error creating group: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Create Secret Santa Group';
+            }
+        });
+    </script>
+</body>
+</html>

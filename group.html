@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secret Santa - Join Group</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎁 Secret Santa</h1>
+            <p class="subtitle" id="occasionName">Loading...</p>
+        </header>
+
+        <main>
+            <!-- Loading State -->
+            <div id="loadingSection">
+                <p>Loading group information...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorSection" style="display: none;">
+                <div class="error-box">
+                    <h2>Oops!</h2>
+                    <p id="errorMessage"></p>
+                </div>
+            </div>
+
+            <!-- Join Form (for new participants) -->
+            <div id="joinSection" style="display: none;">
+                <div class="info-box">
+                    <h3 id="groupOccasion"></h3>
+                    <p id="groupMessage"></p>
+                    <p id="groupBudget" class="budget"></p>
+                </div>
+
+                <form id="joinForm">
+                    <div class="form-group">
+                        <label for="participantSelect">Who are you? *</label>
+                        <select id="participantSelect" required>
+                            <option value="">Select your name...</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary">Join Group</button>
+                </form>
+            </div>
+
+            <!-- Participant Dashboard (for returning participants) -->
+            <div id="dashboardSection" style="display: none;">
+                <div class="info-box">
+                    <h3 id="dashboardOccasion"></h3>
+                    <p id="dashboardMessage"></p>
+                    <p id="dashboardBudget" class="budget"></p>
+                </div>
+
+                <div class="assignment-box">
+                    <h2>Your Secret Santa Assignment</h2>
+                    <p>You are Secret Santa for:</p>
+                    <h3 class="assigned-name" id="assignedPerson"></h3>
+
+                    <div id="theirPreferences">
+                        <h4>Their Gift Preferences:</h4>
+                        <p id="theirPreferencesText" class="preferences-text"></p>
+                    </div>
+                </div>
+
+                <div class="preferences-box">
+                    <h3>Your Gift Preferences</h3>
+                    <p>Let your Secret Santa know what you'd like:</p>
+                    <form id="preferencesForm">
+                        <textarea id="giftPreferences" rows="4" placeholder="E.g., I love books, especially fantasy novels. I also enjoy coffee and board games..."></textarea>
+                        <button type="submit" class="btn-primary">Save Preferences</button>
+                    </form>
+                    <p class="hint">Your Secret Santa will see this message</p>
+                </div>
+
+                <div class="status-box">
+                    <h4>Group Status</h4>
+                    <p id="participantStatus"></p>
+                    <p id="expiresInfo"></p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>No registration required • No cookies • Temporary storage only</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        let currentGroup = null;
+        let currentParticipant = null;
+
+        async function loadGroup() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const groupId = urlParams.get('id');
+
+            if (!groupId) {
+                showError('Invalid link. Please check your URL.');
+                return;
+            }
+
+            try {
+                currentGroup = await getGroup(groupId);
+
+                if (!currentGroup) {
+                    showError('Group not found or has expired.');
+                    return;
+                }
+
+                // Check if user already joined
+                const sessionId = getSessionId();
+                currentParticipant = await getParticipantBySession(groupId, sessionId);
+
+                if (currentParticipant) {
+                    await showDashboard();
+                } else {
+                    await showJoinForm();
+                }
+            } catch (error) {
+                showError('Error loading group: ' + error.message);
+            }
+        }
+
+        async function showJoinForm() {
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('joinSection').style.display = 'block';
+
+            document.getElementById('groupOccasion').textContent = currentGroup.occasion_name;
+            document.getElementById('occasionName').textContent = currentGroup.occasion_name;
+            document.getElementById('groupMessage').textContent = currentGroup.custom_message || '';
+
+            if (currentGroup.budget_limit) {
+                document.getElementById('groupBudget').textContent = `Budget: ${currentGroup.budget_limit}`;
+            }
+
+            // Get available participants (not yet joined)
+            const joinedParticipants = await getGroupParticipants(currentGroup.id);
+            const joinedNames = joinedParticipants.map(p => p.name);
+            const availableNames = currentGroup.participants.filter(name => !joinedNames.includes(name));
+
+            const select = document.getElementById('participantSelect');
+            select.innerHTML = '<option value="">Select your name...</option>';
+
+            availableNames.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+
+            if (availableNames.length === 0) {
+                select.innerHTML = '<option value="">All participants have joined</option>';
+                select.disabled = true;
+                document.querySelector('#joinForm button').disabled = true;
+            }
+        }
+
+        async function showDashboard() {
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('dashboardSection').style.display = 'block';
+
+            document.getElementById('dashboardOccasion').textContent = currentGroup.occasion_name;
+            document.getElementById('occasionName').textContent = currentGroup.occasion_name;
+            document.getElementById('dashboardMessage').textContent = currentGroup.custom_message || '';
+
+            if (currentGroup.budget_limit) {
+                document.getElementById('dashboardBudget').textContent = `Budget: ${currentGroup.budget_limit}`;
+            }
+
+            document.getElementById('assignedPerson').textContent = currentParticipant.assigned_to || 'Loading...';
+            document.getElementById('giftPreferences').value = currentParticipant.gift_preferences || '';
+
+            // Load their preferences (the person we're buying for)
+            if (currentParticipant.assigned_to) {
+                const theirInfo = await getParticipantByName(currentGroup.id, currentParticipant.assigned_to);
+                const preferencesDiv = document.getElementById('theirPreferences');
+                const preferencesText = document.getElementById('theirPreferencesText');
+
+                if (theirInfo && theirInfo.gift_preferences) {
+                    preferencesText.textContent = theirInfo.gift_preferences;
+                } else {
+                    preferencesText.textContent = 'No preferences added yet';
+                    preferencesText.style.fontStyle = 'italic';
+                    preferencesText.style.opacity = '0.7';
+                }
+            }
+
+            // Show group status
+            const allParticipants = await getGroupParticipants(currentGroup.id);
+            const statusText = `${allParticipants.length} of ${currentGroup.participants.length} participants joined`;
+            document.getElementById('participantStatus').textContent = statusText;
+
+            const expiresAt = new Date(currentGroup.expires_at);
+            const now = new Date();
+            const daysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+            document.getElementById('expiresInfo').textContent = `Group expires in ${daysLeft} days`;
+        }
+
+        function showError(message) {
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message;
+        }
+
+        document.getElementById('joinForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const selectedName = document.getElementById('participantSelect').value;
+            if (!selectedName) {
+                alert('Please select your name');
+                return;
+            }
+
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.textContent = 'Joining...';
+
+            try {
+                const sessionId = getSessionId();
+                currentParticipant = await joinGroup(currentGroup.id, selectedName, sessionId);
+                await showDashboard();
+            } catch (error) {
+                alert('Error joining group: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Join Group';
+            }
+        });
+
+        document.getElementById('preferencesForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const preferences = document.getElementById('giftPreferences').value.trim();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                await updatePreferences(currentParticipant.id, preferences);
+                btn.textContent = 'Saved!';
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = 'Save Preferences';
+                }, 2000);
+            } catch (error) {
+                alert('Error saving preferences: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Save Preferences';
+            }
+        });
+
+        // Load group on page load
+        loadGroup();
+    </script>
+</body>
+</html>

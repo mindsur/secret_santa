@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secret Santa - Admin Panel</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎁 Secret Santa - Admin Panel</h1>
+            <p class="subtitle" id="occasionName">Loading...</p>
+        </header>
+
+        <main>
+            <!-- Loading State -->
+            <div id="loadingSection">
+                <p>Loading admin panel...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorSection" style="display: none;">
+                <div class="error-box">
+                    <h2>Access Denied</h2>
+                    <p id="errorMessage"></p>
+                </div>
+            </div>
+
+            <!-- Admin Dashboard -->
+            <div id="adminSection" style="display: none;">
+                <div class="info-box">
+                    <h3 id="groupOccasion"></h3>
+                    <p id="groupMessage"></p>
+                    <p id="groupBudget" class="budget"></p>
+                    <p id="expiresInfo"></p>
+                </div>
+
+                <div class="links-box">
+                    <h3>Share Links</h3>
+                    <div class="link-container">
+                        <label>Participant Link:</label>
+                        <input type="text" id="groupLink" readonly>
+                        <button type="button" class="btn-copy" onclick="copyLink('groupLink')">Copy</button>
+                    </div>
+                </div>
+
+                <div class="status-box">
+                    <h3>Group Status</h3>
+                    <div id="participantList"></div>
+                </div>
+
+                <div class="admin-actions">
+                    <h3>Admin Actions</h3>
+                    <button type="button" class="btn-warning" onclick="rerollAssignments()">Reroll All Assignments</button>
+                    <p class="hint">This will randomly reassign everyone. Current assignments and preferences will be kept.</p>
+                </div>
+
+                <div class="assignments-box">
+                    <h3>Current Assignments (View Only)</h3>
+                    <p class="warning">Secret Santa assignments are visible to you as admin. Don't share this with participants!</p>
+                    <div id="assignmentsList"></div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>No registration required • No cookies • Temporary storage only</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        let currentGroup = null;
+        let participants = [];
+
+        async function loadAdminPanel() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const groupId = urlParams.get('id');
+            const adminCode = urlParams.get('admin');
+
+            if (!groupId || !adminCode) {
+                showError('Invalid admin link. Please check your URL.');
+                return;
+            }
+
+            try {
+                currentGroup = await getGroup(groupId);
+
+                if (!currentGroup) {
+                    showError('Group not found or has expired.');
+                    return;
+                }
+
+                if (currentGroup.admin_code !== adminCode) {
+                    showError('Invalid admin code. You do not have permission to access this page.');
+                    return;
+                }
+
+                await showAdminDashboard();
+            } catch (error) {
+                showError('Error loading admin panel: ' + error.message);
+            }
+        }
+
+        async function showAdminDashboard() {
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('adminSection').style.display = 'block';
+
+            document.getElementById('groupOccasion').textContent = currentGroup.occasion_name;
+            document.getElementById('occasionName').textContent = currentGroup.occasion_name;
+            document.getElementById('groupMessage').textContent = currentGroup.custom_message || 'No custom message';
+
+            if (currentGroup.budget_limit) {
+                document.getElementById('groupBudget').textContent = `Budget: ${currentGroup.budget_limit}`;
+            }
+
+            const expiresAt = new Date(currentGroup.expires_at);
+            const now = new Date();
+            const daysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+            document.getElementById('expiresInfo').textContent = `Group expires in ${daysLeft} days (${expiresAt.toLocaleDateString()})`;
+
+            // Set participant link
+            const baseUrl = window.location.origin + window.location.pathname.replace('admin.html', '');
+            const groupLink = `${baseUrl}group.html?id=${currentGroup.id}`;
+            document.getElementById('groupLink').value = groupLink;
+
+            await refreshParticipantList();
+        }
+
+        async function refreshParticipantList() {
+            participants = await getGroupParticipants(currentGroup.id);
+
+            // Show participant status
+            const participantListDiv = document.getElementById('participantList');
+            const joinedNames = participants.map(p => p.name);
+            const notJoinedNames = currentGroup.participants.filter(name => !joinedNames.includes(name));
+
+            let html = `<p><strong>${participants.length} of ${currentGroup.participants.length} participants joined</strong></p>`;
+
+            if (participants.length > 0) {
+                html += '<h4>Joined:</h4><ul>';
+                participants.forEach(p => {
+                    const prefIcon = p.gift_preferences ? '✓' : '○';
+                    html += `<li>${p.name} ${prefIcon} (joined ${new Date(p.joined_at).toLocaleDateString()})</li>`;
+                });
+                html += '</ul>';
+                html += '<p class="hint">✓ = has added gift preferences, ○ = no preferences yet</p>';
+            }
+
+            if (notJoinedNames.length > 0) {
+                html += '<h4>Not Joined Yet:</h4><ul>';
+                notJoinedNames.forEach(name => {
+                    html += `<li>${name}</li>`;
+                });
+                html += '</ul>';
+            }
+
+            participantListDiv.innerHTML = html;
+
+            // Show assignments
+            const assignmentsDiv = document.getElementById('assignmentsList');
+            if (participants.length > 0) {
+                let assignmentsHtml = '<ul class="assignments-list">';
+                participants.forEach(p => {
+                    const assignedTo = p.assigned_to || 'Not assigned yet';
+                    assignmentsHtml += `<li><strong>${p.name}</strong> → ${assignedTo}</li>`;
+                });
+                assignmentsHtml += '</ul>';
+                assignmentsDiv.innerHTML = assignmentsHtml;
+            } else {
+                assignmentsDiv.innerHTML = '<p>No participants have joined yet.</p>';
+            }
+        }
+
+        async function rerollAssignments() {
+            if (!confirm('Are you sure you want to reroll all Secret Santa assignments? This will randomly reassign everyone.')) {
+                return;
+            }
+
+            try {
+                await rerollGroupAssignments(currentGroup.id);
+                alert('Assignments have been rerolled!');
+                await refreshParticipantList();
+            } catch (error) {
+                alert('Error rerolling assignments: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message;
+        }
+
+        function copyLink(elementId) {
+            const input = document.getElementById(elementId);
+            input.select();
+            input.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(input.value);
+
+            const btn = input.nextElementSibling;
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        }
+
+        // Load admin panel on page load
+        loadAdminPanel();
+    </script>
+</body>
+</html>

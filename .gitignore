@@ -1,0 +1,20 @@
+# Environment and config files with credentials
+# IMPORTANT: Don't commit js/config.js with your real Supabase credentials!
+# You should configure these values after deploying
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
